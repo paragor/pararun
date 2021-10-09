@@ -1,6 +1,9 @@
 LINUX_BINARY_PATH=build/linux
 PARARUN_MAIN=cmd/pararun/main.go
 
+REMOTE_SSH=centos
+REMOTE_DIR_BIN=/tmp/linux
+
 .PHONY: all
 all: build run_remote
 
@@ -11,7 +14,8 @@ build:
 
 .PHONY: run_remote
 run_remote:
-	scp ${LINUX_BINARY_PATH} centos:/tmp/linux
-	ssh centos sudo /tmp/linux
+	scp ${LINUX_BINARY_PATH} ${REMOTE_SSH}:${REMOTE_DIR_BIN}
+	ssh ${REMOTE_SSH} sudo chmod +x ${REMOTE_DIR_BIN}
+	ssh -t ${REMOTE_SSH} sudo ${REMOTE_DIR_BIN}
 
 
