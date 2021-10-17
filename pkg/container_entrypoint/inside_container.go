@@ -33,7 +33,11 @@ func RegisterInsideContainerEntrypoint() {
 			panic(err)
 		}
 
-		if err := network.ContainerApplyConfig(nc, string(resolvConfContent)); err != nil {
+		if err := network.SetupHostname(nc); err != nil {
+			panic(err)
+		}
+
+		if err := network.SetupResolvConf(nc, string(resolvConfContent)); err != nil {
 			panic(err)
 		}
 

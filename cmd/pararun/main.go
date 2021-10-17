@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/paragor/pararun/pkg/container_entrypoint"
 	"github.com/paragor/pararun/pkg/hacks"
@@ -8,8 +9,11 @@ import (
 	"github.com/paragor/pararun/pkg/network"
 	"github.com/paragor/pararun/pkg/reexec"
 	"log"
+	"math/rand"
 	"net"
 	"os"
+	"path"
+	"time"
 )
 
 const imageUrl = "http://dl-cdn.alpinelinux.org/alpine/v3.10/releases/x86_64/alpine-minirootfs-3.10.1-x86_64.tar.gz"
@@ -18,6 +22,7 @@ const imageName = "alpine"
 const containerRootDir = "/var/lib/pararun/root/"
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	container_entrypoint.RegisterInsideContainerEntrypoint()
 	if reexec.Init() {
 		os.Exit(0)
@@ -39,14 +44,21 @@ func main() {
 		panic(err)
 	}
 
-	err = os.MkdirAll(containerRootDir, 0755)
+	var containerName string
+	fmt.Printf("container name: ")
+	fmt.Scanf("%s", &containerName)
+
+	containerFs := path.Join(containerRootDir,containerName)
+
+	err = os.MkdirAll(containerFs, 0755)
 	if err != nil {
 		panic(err)
 	}
 
-	if err := imageController.UnpackImage(imageName, containerRootDir); err != nil {
+	if err := imageController.UnpackImage(imageName, containerFs); err != nil {
 		panic(err)
 	}
+
 
 	networkConfig := &network.NetworkConfig{
 		BridgeConfig: &network.BridgeConfig{
@@ -55,9 +67,8 @@ func main() {
 				IP:   net.IPv4(192, 168, 123, 1),
 				Mask: net.IPv4Mask(255, 255, 255, 0),
 			},
-			VethName: "pararun.veth0",
 			ContainerNet: net.IPNet{
-				IP:   net.IPv4(192, 168, 123, 2),
+				IP:   net.IPv4(192, 168, 123, byte(rand.Intn(250) + 1)),
 				Mask: net.IPv4Mask(255, 255, 255, 0),
 			},
 		},
@@ -74,7 +85,7 @@ func main() {
 	containerSpec := &container_entrypoint.ContainerSpecification{
 		Command:             "/bin/sh",
 		Args:                []string{},
-		ContainerRootOnHost: containerRootDir,
+		ContainerRootOnHost: containerFs,
 		NetworkConfig:       networkConfig,
 	}
 

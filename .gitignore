@@ -2,3 +2,5 @@
 .vagrant
 .secret.env
 build
+!runtime/centos/share/.gitkeep
+runtime/centos/share

@@ -27,7 +27,6 @@ type BridgeConfig struct {
 	BridgeName string    `json:"bridge_name"`
 	BridgeNet  net.IPNet `json:"bridge_net"`
 
-	VethName     string    `json:"veth_name"`
 	ContainerNet net.IPNet `json:"container_net"`
 }
 
@@ -37,9 +36,6 @@ func ValidateConfig(nc *NetworkConfig) error {
 	}
 
 	if nc.BridgeConfig != nil {
-		if err := checkIface(nc.BridgeConfig.VethName); err != nil {
-			return err
-		}
 		if err := checkIface(nc.BridgeConfig.BridgeName); err != nil {
 			return err
 		}

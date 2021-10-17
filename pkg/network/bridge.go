@@ -2,13 +2,14 @@ package network
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 )
 
-const namespacePrefix = "pararun."
+const namespacePrefix = "pr."
 
 func SetupBridgeNetwork(nc *NetworkConfig, containerPid int) error {
 	namespaceName, err := setupNetworkNamespace(containerPid)
@@ -57,8 +58,9 @@ func setupBridge(nc *NetworkConfig, ns string) error {
 		}...)
 	}
 
-	hostVeth := nc.BridgeConfig.VethName + ".h"
-	containerVeth := nc.BridgeConfig.VethName + ".c"
+	vethBasicName := ns + "." + strconv.Itoa(rand.Intn(10))
+	hostVeth := vethBasicName + ".h"
+	containerVeth := vethBasicName + ".c"
 	fullNsPath := fmt.Sprintf("/var/run/netns/%s", ns)
 	commands = append(commands, [][]string{
 		{"ip", "link", "add", hostVeth, "type", "veth", "peer", "name", containerVeth},

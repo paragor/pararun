@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -9,25 +10,29 @@ import (
 	"time"
 )
 
-func HostApplyConfig(nc *NetworkConfig) error {
-	return nil
-}
-
-func ContainerApplyConfig(nc *NetworkConfig, hostResolveConf string ) error {
+func SetupHostname(nc *NetworkConfig) error {
 	err := syscall.Sethostname([]byte(nc.Hostname))
 	if err != nil {
 		panic(err)
 	}
 
-	err = setupResolvConf(nc, hostResolveConf)
+	file, err := os.OpenFile("/etc/hosts", syscall.O_RDWR | syscall.O_CREAT |syscall.O_APPEND, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("cant open /etc/hosts: %w", err)
+	}
+
+	if _, err := file.Seek(0, io.SeekEnd); err != nil {
+		return fmt.Errorf("cant seek file /etc/hosts: %w", err)
+	}
+
+	if _, err := file.WriteString(fmt.Sprintf("\n127.0.0.1 %s\n", nc.Hostname)); err != nil {
+		return fmt.Errorf("cant append file /etc/hosts: %w", err)
 	}
 
 	return nil
 }
 
-func setupResolvConf(nc *NetworkConfig, hostResolveConf string) error {
+func SetupResolvConf(nc *NetworkConfig, hostResolveConf string) error {
 	err := os.MkdirAll("/etc", 0755)
 	if err != nil {
 		return fmt.Errorf("cant mkdir /etc: %w", err)
@@ -49,6 +54,7 @@ func setupResolvConf(nc *NetworkConfig, hostResolveConf string) error {
 			return fmt.Errorf("cant write /etc/resolv.conf: %w", err)
 		}
 	}
+
 	return nil
 }
 

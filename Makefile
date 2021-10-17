@@ -5,7 +5,7 @@ REMOTE_SSH=centos
 REMOTE_DIR_BIN=/tmp/linux
 
 .PHONY: all
-all: build run_remote
+all: centos build run_remote
 
 .PHONY: build
 build:
@@ -18,4 +18,7 @@ run_remote:
 	ssh ${REMOTE_SSH} sudo chmod +x ${REMOTE_DIR_BIN}
 	ssh -t ${REMOTE_SSH} sudo ${REMOTE_DIR_BIN}
 
+.PHONY: cetnos
+centos:
+	cd runtime/centos && vagrant up
 
