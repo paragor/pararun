@@ -5,8 +5,10 @@ import (
 	"github.com/paragor/pararun/pkg/container_entrypoint"
 	"github.com/paragor/pararun/pkg/hacks"
 	"github.com/paragor/pararun/pkg/image"
+	"github.com/paragor/pararun/pkg/network"
 	"github.com/paragor/pararun/pkg/reexec"
 	"log"
+	"net"
 	"os"
 )
 
@@ -46,8 +48,26 @@ func main() {
 		panic(err)
 	}
 
+	networkConfig := &network.NetworkConfig{
+		BridgeConfig: network.BridgeConfig{
+			BridgeName:   "",
+			BridgeNet:    net.IPNet{},
+			VethName:     "",
+			ContainerNet: net.IPNet{},
+		},
+		Nameservers: []net.IP{
+			net.IPv4(1, 1, 1, 1),
+			net.IPv4(8, 8, 8, 8),
+		},
+		Hostname: uuid.New().String(),
+		Type:     network.NetworkTypeHost,
+	}
+	if err := network.ValidateConfig(networkConfig); err != nil {
+		panic(err)
+	}
+
 	log.Println("[PARARUN] start container")
-	if err := container_entrypoint.StartContainer("/bin/sh", containerRootDir, uuid.New().String()); err != nil {
+	if err := container_entrypoint.StartContainer("/bin/sh", containerRootDir, networkConfig); err != nil {
 		panic(err)
 	}
 }

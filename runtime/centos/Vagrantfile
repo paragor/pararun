@@ -1,0 +1,44 @@
+# -*- mode: ruby -*-
+# # vi: set ft=ruby :
+
+# For help on using kubespray with vagrant, check out docs/vagrant.md
+
+require 'fileutils'
+
+Vagrant.require_version ">= 2.0.0"
+
+# Uniq disk UUID for libvirt
+DISK_UUID = Time.now.utc.to_i
+
+# Defaults for config options defined in CONFIG
+$instance_name = "centos-primary"
+$vm_memory = 2048
+$vm_cpus = 2
+$os = "centos/7"
+$user = "tech"
+$disk_size = "25GB"
+
+  # Install vagrant-disksize to allow resizing the vagrant box disk.
+unless Vagrant.has_plugin?("vagrant-disksize")
+    raise  Vagrant::Errors::VagrantError.new, "vagrant-disksize plugin is missing. Please install it using 'vagrant plugin install vagrant-disksize' and rerun 'vagrant up'"
+end
+Vagrant.configure("2") do |config|
+
+  config.vm.box = $os
+  config.ssh.username = 'vagrant'
+  config.vm.hostname = $instance_name
+
+  # always use Vagrants insecure key
+  config.ssh.insert_key = false
+
+  config.disksize.size = $disk_size
+  config.vm.synced_folder "share/", "/share/", type: "nfs"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = $vm_memory
+    vb.cpus = $vm_cpus
+    vb.gui = false
+    vb.customize ["modifyvm", :id, "--audio", "none"]
+  end
+
+end

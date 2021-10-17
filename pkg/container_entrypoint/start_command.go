@@ -2,37 +2,45 @@ package container_entrypoint
 
 import (
 	"fmt"
+	"github.com/paragor/pararun/pkg/network"
 	"github.com/paragor/pararun/pkg/reexec"
 	"os"
-	"regexp"
 	"syscall"
 )
 
 const (
-	RootEnv = "PARARUN_ROOT"
-	HostEnv = "HOST_ROOT"
+	ContainerRootDirOnHostEnv = "PARARUN_ROOT"
+	NetworkConfigEnv          = "NETWORK_CONFIG_ROOT"
 )
 
-func StartContainer(command string, root string, hostname string) error {
-	err := checkHostname(hostname)
+func StartContainer(command string, root string, nc *network.NetworkConfig) error {
+	configEncoded, err := network.MarshalNetworkConfig(nc)
 	if err != nil {
-		return err
+		return fmt.Errorf("cant marshal network nc: %w", err)
 	}
 
 	cmd := reexec.Command(command)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = []string{"PS1=[pararun] # ", RootEnv + "=" + root, HostEnv + "=" + hostname}
+	cmd.Env = []string{
+		"PS1=[pararun] # ", ContainerRootDirOnHostEnv + "=" + root,
+		NetworkConfigEnv + "=" + configEncoded,
+	}
 	cmd.Dir = "/"
+	var cloneFlags uintptr = syscall.CLONE_NEWIPC |
+		syscall.CLONE_NEWNS |
+		syscall.CLONE_NEWPID |
+		syscall.CLONE_NEWUSER |
+		syscall.CLONE_NEWUTS
+
+	if nc.Type != network.NetworkTypeHost {
+		cloneFlags |= syscall.CLONE_NEWNET
+	}
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Pdeathsig: syscall.SIGTERM,
-		Cloneflags: syscall.CLONE_NEWIPC |
-			syscall.CLONE_NEWNET |
-			syscall.CLONE_NEWNS |
-			syscall.CLONE_NEWPID |
-			syscall.CLONE_NEWUSER |
-			syscall.CLONE_NEWUTS,
+		Pdeathsig:    syscall.SIGTERM,
+		Cloneflags:   cloneFlags,
 		Unshareflags: 0,
 		UidMappings: []syscall.SysProcIDMap{
 			{
@@ -53,14 +61,6 @@ func StartContainer(command string, root string, hostname string) error {
 	}
 	if err := cmd.Run(); err != nil {
 		return err
-	}
-	return nil
-}
-
-var hostnameRe = regexp.MustCompile("^[0-9a-z-A-Z]+$")
-func checkHostname(hostname string) error {
-	if !hostnameRe.MatchString(hostname) {
-		return fmt.Errorf("hostname not pass regexp: %s", hostnameRe.String())
 	}
 	return nil
 }
