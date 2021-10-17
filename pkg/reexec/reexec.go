@@ -1,37 +1,33 @@
 package reexec
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
 )
 
-const ExecCommand = "reexec"
+var registeredInitializers = make(map[string]func(), 0)
 
-var registeredInitializers = make([]func(), 0)
-
-func Register(initializer func()) {
-	registeredInitializers = append(registeredInitializers, initializer)
+func Register(name string, initializer func()) {
+	if _, exists := registeredInitializers[name]; exists {
+		panic(fmt.Errorf("hook %s already exists", name))
+	}
+	registeredInitializers[name] = initializer
 }
 
 func Init() bool {
-	if os.Args[0] == ExecCommand {
-		for _, initializer := range registeredInitializers {
-			initializer()
-		}
-
-		if err := syscall.Exec(os.Args[1], os.Args[1:], os.Environ()); err != nil {
-			panic(err)
-		}
+	if initializer, ok := registeredInitializers[os.Args[0]]; ok {
+		initializer()
 		return true
 	}
 	return false
 }
 
-func Command(args ...string) *exec.Cmd {
+func Command(hook string, args ...string) *exec.Cmd {
 	return &exec.Cmd{
 		Path: "/proc/self/exe",
-		Args: append([]string{ExecCommand}, args...),
+		Args: append([]string{hook}, args...),
 		SysProcAttr: &syscall.SysProcAttr{
 			Pdeathsig: syscall.SIGTERM,
 		},

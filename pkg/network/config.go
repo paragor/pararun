@@ -19,8 +19,8 @@ type NetworkConfig struct {
 	Nameservers []net.IP `json:"nameservers"`
 	Hostname    string   `json:"hostname"`
 
-	BridgeConfig BridgeConfig `json:"bridge_config"`
-	Type         NetworkType  `json:"type"`
+	BridgeConfig  *BridgeConfig `json:"bridge_config"`
+	Type          NetworkType   `json:"type"`
 }
 
 type BridgeConfig struct {
@@ -32,9 +32,26 @@ type BridgeConfig struct {
 }
 
 func ValidateConfig(nc *NetworkConfig) error {
-	err := checkHostname(nc.Hostname)
-	if err != nil {
+	if err := checkHostname(nc.Hostname); err != nil {
 		return err
+	}
+
+	if nc.BridgeConfig != nil {
+		if err := checkIface(nc.BridgeConfig.VethName); err != nil {
+			return err
+		}
+		if err := checkIface(nc.BridgeConfig.BridgeName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var ifaceRe = regexp.MustCompile("^[0-9a-z.]+$")
+
+func checkIface(iface string) error {
+	if !ifaceRe.MatchString(iface) {
+		return fmt.Errorf("iface '%w' not pass regexp: %s", iface, ifaceRe.String())
 	}
 	return nil
 }

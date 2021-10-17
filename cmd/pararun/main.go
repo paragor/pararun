@@ -18,7 +18,7 @@ const imageName = "alpine"
 const containerRootDir = "/var/lib/pararun/root/"
 
 func main() {
-	container_entrypoint.RegisterAllReexecHooks()
+	container_entrypoint.RegisterInsideContainerEntrypoint()
 	if reexec.Init() {
 		os.Exit(0)
 	}
@@ -49,25 +49,37 @@ func main() {
 	}
 
 	networkConfig := &network.NetworkConfig{
-		BridgeConfig: network.BridgeConfig{
-			BridgeName:   "",
-			BridgeNet:    net.IPNet{},
-			VethName:     "",
-			ContainerNet: net.IPNet{},
+		BridgeConfig: &network.BridgeConfig{
+			BridgeName: "pararun.br0",
+			BridgeNet: net.IPNet{
+				IP:   net.IPv4(192, 168, 123, 1),
+				Mask: net.IPv4Mask(255, 255, 255, 0),
+			},
+			VethName: "pararun.veth0",
+			ContainerNet: net.IPNet{
+				IP:   net.IPv4(192, 168, 123, 2),
+				Mask: net.IPv4Mask(255, 255, 255, 0),
+			},
 		},
 		Nameservers: []net.IP{
 			net.IPv4(1, 1, 1, 1),
 			net.IPv4(8, 8, 8, 8),
 		},
 		Hostname: uuid.New().String(),
-		Type:     network.NetworkTypeHost,
+		Type:     network.NetworkTypeBridge,
 	}
 	if err := network.ValidateConfig(networkConfig); err != nil {
 		panic(err)
 	}
+	containerSpec := &container_entrypoint.ContainerSpecification{
+		Command:             "/bin/sh",
+		Args:                []string{},
+		ContainerRootOnHost: containerRootDir,
+		NetworkConfig:       networkConfig,
+	}
 
 	log.Println("[PARARUN] start container")
-	if err := container_entrypoint.StartContainer("/bin/sh", containerRootDir, networkConfig); err != nil {
+	if err := container_entrypoint.StartContainer(containerSpec); err != nil {
 		panic(err)
 	}
 }

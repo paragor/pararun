@@ -7,23 +7,24 @@ import (
 	"github.com/paragor/pararun/pkg/reexec"
 	"io/ioutil"
 	"os"
+	"syscall"
 	"time"
 )
 
-// RegisterAllReexecHooks pre start хуки в неймспейсе контейнера
-func RegisterAllReexecHooks() {
-	reexec.Register(func() {
+const insideContainerEntrypoint = "inside_container_hook"
+
+// RegisterInsideContainerEntrypoint pre start хуки в неймспейсе контейнера
+func RegisterInsideContainerEntrypoint() {
+	reexec.Register(insideContainerEntrypoint, func() {
 		resolvConfContent, err := ioutil.ReadFile("/etc/resolv.conf")
 		if err != nil {
 			panic(fmt.Errorf("cant read /etc/resolv.conf: %w", err))
 		}
 
-		err = mounts.MountProc(os.Getenv(ContainerRootDirOnHostEnv))
-		if err != nil {
+		if err := mounts.MountProc(os.Getenv(ContainerRootDirOnHostEnv)); err != nil {
 			panic(err)
 		}
-		err = mounts.PivotRoot(os.Getenv(ContainerRootDirOnHostEnv))
-		if err != nil {
+		if err := mounts.PivotRoot(os.Getenv(ContainerRootDirOnHostEnv)); err != nil {
 			panic(err)
 		}
 
@@ -32,18 +33,18 @@ func RegisterAllReexecHooks() {
 			panic(err)
 		}
 
-		err = network.ContainerApplyConfig(nc, string(resolvConfContent))
-		if err != nil {
+		if err := network.ContainerApplyConfig(nc, string(resolvConfContent)); err != nil {
 			panic(err)
 		}
 
-		err = network.WaitNetwork(time.Second * 5)
-		if err != nil {
+		if err := network.WaitNetwork(time.Second * 5); err != nil {
 			panic(err)
 		}
-	})
 
-	reexec.Register(func() {
+		if err := syscall.Exec(os.Args[1], os.Args[1:], os.Environ()); err != nil {
+			panic(err)
+		}
+
 		_ = os.Unsetenv(ContainerRootDirOnHostEnv)
 	})
 

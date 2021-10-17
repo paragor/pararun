@@ -7,6 +7,9 @@ import (
 
 func RunHacks() error {
 	if isCentos() {
+		if err := hacks_centos7.EnableIpForward(); err != nil {
+			return err
+		}
 		return hacks_centos7.EnableUserNamespaces()
 	}
 

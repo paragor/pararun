@@ -13,18 +13,25 @@ const (
 	NetworkConfigEnv          = "NETWORK_CONFIG_ROOT"
 )
 
-func StartContainer(command string, root string, nc *network.NetworkConfig) error {
-	configEncoded, err := network.MarshalNetworkConfig(nc)
+type ContainerSpecification struct {
+	Command             string
+	Args                []string
+	ContainerRootOnHost string
+	NetworkConfig       *network.NetworkConfig
+}
+
+func StartContainer(containerSpec *ContainerSpecification) error {
+	configEncoded, err := network.MarshalNetworkConfig(containerSpec.NetworkConfig)
 	if err != nil {
 		return fmt.Errorf("cant marshal network nc: %w", err)
 	}
 
-	cmd := reexec.Command(command)
+	cmd := reexec.Command(insideContainerEntrypoint, append([]string{containerSpec.Command}, containerSpec.Args...)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = []string{
-		"PS1=[pararun] # ", ContainerRootDirOnHostEnv + "=" + root,
+		"PS1=[pararun] # ", ContainerRootDirOnHostEnv + "=" + containerSpec.ContainerRootOnHost,
 		NetworkConfigEnv + "=" + configEncoded,
 	}
 	cmd.Dir = "/"
@@ -34,7 +41,7 @@ func StartContainer(command string, root string, nc *network.NetworkConfig) erro
 		syscall.CLONE_NEWUSER |
 		syscall.CLONE_NEWUTS
 
-	if nc.Type != network.NetworkTypeHost {
+	if containerSpec.NetworkConfig.Type != network.NetworkTypeHost {
 		cloneFlags |= syscall.CLONE_NEWNET
 	}
 
@@ -59,7 +66,21 @@ func StartContainer(command string, root string, nc *network.NetworkConfig) erro
 		GidMappingsEnableSetgroups: false,
 		AmbientCaps:                nil,
 	}
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	if containerSpec.NetworkConfig.Type == network.NetworkTypeBridge {
+		if err := network.SetupBridgeNetwork(containerSpec.NetworkConfig, cmd.Process.Pid); err != nil {
+			killErr := syscall.Kill(cmd.Process.Pid, syscall.SIGINT)
+			if killErr != nil {
+				return fmt.Errorf("cant kill porcess on error upLoopback: %w; origin err: %w", killErr, err)
+			}
+			return fmt.Errorf("cant setup bridge: %w", err)
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
 		return err
 	}
 	return nil
