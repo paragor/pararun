@@ -21,15 +21,8 @@ func SetupBridgeNetwork(nc *NetworkConfig, containerPid int) error {
 		return fmt.Errorf("cant up loopback: %w", err)
 	}
 
-	if _, err := net.InterfaceByName(nc.BridgeConfig.BridgeName); err != nil {
-		err := setupBridge(nc)
-		if err != nil {
-			return fmt.Errorf("cant setup bridge on host: %w", err)
-		}
-	}
-
-	if err := setupVeth(nc, namespaceName); err != nil {
-		return fmt.Errorf("cant setup veth on host: %w", err)
+	if err := setupBridge(nc, namespaceName); err != nil {
+		return fmt.Errorf("cant setup bridge on host: %w", err)
 	}
 
 	return nil
@@ -51,17 +44,26 @@ func unSetupNetworkNamespace(ns string) error {
 	return nil
 }
 
-func setupBridge(nc *NetworkConfig) error {
-	return nil
-}
-func setupVeth(nc *NetworkConfig, ns string) error {
+func setupBridge(nc *NetworkConfig, ns string) error {
+	commands := [][]string{}
+
+	if _, err := net.InterfaceByName(nc.BridgeConfig.BridgeName); err != nil {
+		commands = append(commands, [][]string{
+			// todo идемпотентно создавать iptables для бриджа
+			{"iptables", "-t", "nat", "-I", "POSTROUTING", "-s", nc.BridgeConfig.BridgeNet.String(), "!", "-o", nc.BridgeConfig.BridgeName, "-j", "MASQUERADE"},
+			{"ip", "link", "add", nc.BridgeConfig.BridgeName, "type", "bridge"},
+			{"ip", "addr", "replace", nc.BridgeConfig.BridgeNet.String(), "dev", nc.BridgeConfig.BridgeName},
+			{"ip", "link", "set", nc.BridgeConfig.BridgeName, "up"},
+		}...)
+	}
+
 	hostVeth := nc.BridgeConfig.VethName + ".h"
 	containerVeth := nc.BridgeConfig.VethName + ".c"
 	fullNsPath := fmt.Sprintf("/var/run/netns/%s", ns)
-	commands := [][]string{
-		{"iptables", "-t", "nat", "-I", "POSTROUTING", "-s", nc.BridgeConfig.BridgeNet.String(), "!", "-o", hostVeth, "-j", "MASQUERADE"},
+	commands = append(commands, [][]string{
 		{"ip", "link", "add", hostVeth, "type", "veth", "peer", "name", containerVeth},
-		{"ip", "addr", "add", nc.BridgeConfig.BridgeNet.String(), "dev", hostVeth},
+		{"ip", "link", "set", hostVeth, "master", nc.BridgeConfig.BridgeName},
+
 		{"ip", "link", "set", containerVeth, "netns", ns},
 		{"ip", "link", "set", hostVeth, "up"},
 		{"nsenter", "--net=" + fullNsPath, "ip", "link", "sh"},
@@ -70,7 +72,7 @@ func setupVeth(nc *NetworkConfig, ns string) error {
 		{"nsenter", "--net=" + fullNsPath, "ip", "link", "set", "eth0", "up"},
 		{"nsenter", "--net=" + fullNsPath, "ip", "addr", "add", nc.BridgeConfig.ContainerNet.String(), "dev", "eth0"},
 		{"nsenter", "--net=" + fullNsPath, "ip", "route", "replace", "default", "via", nc.BridgeConfig.BridgeNet.IP.String(), "dev", "eth0"},
-	}
+	}...)
 
 	for _, args := range commands {
 		if err := easyCmd(args[0], args[1:]...); err != nil {
