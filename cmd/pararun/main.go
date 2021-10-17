@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/google/uuid"
 	"github.com/paragor/pararun/pkg/container_entrypoint"
 	"github.com/paragor/pararun/pkg/hacks"
 	"github.com/paragor/pararun/pkg/image"
@@ -46,7 +47,7 @@ func main() {
 	}
 
 	log.Println("[PARARUN] start container")
-	if err := container_entrypoint.StartContainer("/bin/sh", containerRootDir); err != nil {
+	if err := container_entrypoint.StartContainer("/bin/sh", containerRootDir, uuid.New().String()); err != nil {
 		panic(err)
 	}
 }
