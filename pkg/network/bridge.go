@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"github.com/paragor/pararun/pkg/sugar"
 	"math/rand"
 	"net"
 	"os"
@@ -77,7 +78,7 @@ func setupBridge(nc *NetworkConfig, ns string) error {
 	}...)
 
 	for _, args := range commands {
-		if err := easyCmd(args[0], args[1:]...); err != nil {
+		if err := sugar.EasyCmd(args[0], args[1:]...); err != nil {
 			return fmt.Errorf("cant exec '%s': %w", strings.Join(args, " "), err)
 		}
 	}
@@ -89,7 +90,7 @@ func getNamespaceName(pid int) string {
 }
 
 func upLoopback(pid int) error {
-	if err := easyCmd("nsenter", "--target", strconv.Itoa(pid), "-n", "ip", "link", "set", "lo", "up"); err != nil {
+	if err := sugar.EasyCmd("nsenter", "--target", strconv.Itoa(pid), "-n", "ip", "link", "set", "lo", "up"); err != nil {
 		return err
 	}
 	return nil

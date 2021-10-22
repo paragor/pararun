@@ -2,6 +2,7 @@ package container_entrypoint
 
 import (
 	"fmt"
+	"github.com/paragor/pararun/pkg/cgroups/cgroup_applier"
 	"github.com/paragor/pararun/pkg/network"
 	"github.com/paragor/pararun/pkg/reexec"
 	"os"
@@ -12,13 +13,6 @@ const (
 	ContainerRootDirOnHostEnv = "PARARUN_ROOT"
 	NetworkConfigEnv          = "NETWORK_CONFIG_ROOT"
 )
-
-type ContainerSpecification struct {
-	Command             string
-	Args                []string
-	ContainerRootOnHost string
-	NetworkConfig       *network.NetworkConfig
-}
 
 func StartContainer(containerSpec *ContainerSpecification) error {
 	configEncoded, err := network.MarshalNetworkConfig(containerSpec.NetworkConfig)
@@ -68,6 +62,14 @@ func StartContainer(containerSpec *ContainerSpecification) error {
 	}
 	if err := cmd.Start(); err != nil {
 		return err
+	}
+
+	if containerSpec.CgroupSpec != nil {
+		if closer, err := cgroup_applier.ApplyCgroupConfig(containerSpec.CgroupSpec, cmd.Process.Pid); err != nil {
+			return fmt.Errorf("on apply cgroup config: %w", err)
+		} else {
+			defer closer()
+		}
 	}
 
 	if containerSpec.NetworkConfig.Type == network.NetworkTypeBridge {

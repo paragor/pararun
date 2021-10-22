@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/paragor/pararun/pkg/cgroups/cgroup_applier"
 	"github.com/paragor/pararun/pkg/container_entrypoint"
 	"github.com/paragor/pararun/pkg/hacks"
 	"github.com/paragor/pararun/pkg/image"
@@ -48,7 +49,7 @@ func main() {
 	fmt.Printf("container name: ")
 	fmt.Scanf("%s", &containerName)
 
-	containerFs := path.Join(containerRootDir,containerName)
+	containerFs := path.Join(containerRootDir, containerName)
 
 	err = os.MkdirAll(containerFs, 0755)
 	if err != nil {
@@ -59,7 +60,6 @@ func main() {
 		panic(err)
 	}
 
-
 	networkConfig := &network.NetworkConfig{
 		BridgeConfig: &network.BridgeConfig{
 			BridgeName: "pararun.br0",
@@ -68,7 +68,7 @@ func main() {
 				Mask: net.IPv4Mask(255, 255, 255, 0),
 			},
 			ContainerNet: net.IPNet{
-				IP:   net.IPv4(192, 168, 123, byte(rand.Intn(250) + 1)),
+				IP:   net.IPv4(192, 168, 123, byte(rand.Intn(250)+1)),
 				Mask: net.IPv4Mask(255, 255, 255, 0),
 			},
 		},
@@ -87,6 +87,10 @@ func main() {
 		Args:                []string{},
 		ContainerRootOnHost: containerFs,
 		NetworkConfig:       networkConfig,
+		CgroupSpec: &cgroup_applier.CgroupSpec{Cpuset: &cgroup_applier.CgroupCpusetSpec{
+			NumaZone: 0,
+			CpuList:  []uint8{0},
+		}},
 	}
 
 	log.Println("[PARARUN] start container")

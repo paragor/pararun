@@ -1,4 +1,4 @@
-package network
+package sugar
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"os/exec"
 )
 
-func easyCmd(command string, args ...string) error {
+func EasyCmd(command string, args ...string) error {
 	buffer := bytes.NewBuffer(nil)
 
 	cmd := exec.Command(command, args...)
